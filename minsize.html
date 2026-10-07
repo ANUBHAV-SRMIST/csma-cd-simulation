@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CSMA/CD - Minimum Size</title>
+<style>
+  *{box-sizing:border-box;}
+  html,body{margin:0;min-height:100%;}
+  body{background:#2e98d1;font-family:"Times New Roman",serif;color:#000;overflow-x:auto;}
+
+  .topline{height:8px;background:#ff6a00;}
+  .navbar{background:#9acd32;margin:8px;padding:10px;display:flex;gap:20px;}
+  .navbar a{color:#5b2a91;text-decoration:none;font-size:1.1rem;}
+  .navbar a:hover,.navbar a.active{text-decoration:underline;}
+
+  .info{background:#9acd32;margin:90px 20px 0 20px;padding:0 2px;font-size:1rem;line-height:1.12;}
+  .info a{color:#0000ee;}
+
+  .stage{position:relative;width:1520px;height:560px;}
+
+  .node{
+    position:absolute;top:150px;width:200px;height:200px;border-radius:50%;
+    background:#9acd32;border:2px solid #5d6b3a;padding:0 14px;text-align:center;
+    display:flex;align-items:center;justify-content:center;
+    font:14px Arial,sans-serif;line-height:1.3;
+  }
+  .user{left:208px;}
+  .bot{left:883px;}
+  .node.crash{animation:shake .35s;}
+  @keyframes shake{25%{transform:translateX(-4px);}75%{transform:translateX(4px);}}
+
+  .channel{position:absolute;left:300px;top:142px;width:690px;height:8px;display:flex;gap:10px;}
+  .cell{flex:1;height:6px;background:#000;border:1px solid #666;}
+  .cell.u{background:#ff2020;}
+  .cell.b{background:#00e5ff;}
+  .cell.x{background:#ff9d00;box-shadow:0 0 8px 3px #ffd34d;}
+
+  .btns{position:absolute;left:208px;top:362px;width:200px;display:flex;flex-direction:column;align-items:center;gap:6px;}
+  .btn-red{
+    background:#ff4d4d;border:2px solid #c40000;border-radius:4px;
+    font:12px Arial,sans-serif;padding:3px 8px;cursor:pointer;
+  }
+  .btn-red:hover:not(:disabled){background:#ff6b6b;}
+  .btn-red:disabled{opacity:.55;cursor:not-allowed;}
+  .btn-red.pulse{animation:pulse .8s infinite;}
+  @keyframes pulse{50%{box-shadow:0 0 10px 3px #fff;}}
+  #sendBtn{width:70px;padding:4px 8px;}
+  .sizerow{display:flex;align-items:center;gap:4px;font-size:16px;margin-left:50px;}
+  .sizerow input{width:48px;height:20px;border:1px solid #666;border-radius:2px;}
+
+  .status{
+    position:absolute;left:1283px;top:130px;width:220px;height:220px;
+    background:#9acd32;border-radius:4px;padding:10px;font-size:15px;overflow-y:auto;white-space:pre-line;
+  }
+  .kinput{
+    position:absolute;left:1283px;top:362px;width:177px;padding:5px 3px;
+    border:2px solid #000;border-radius:3px;font:14px Arial,sans-serif;
+  }
+  .kinput:disabled{border-color:transparent;background:#6cb3dc;}
+  .check{
+    position:absolute;left:1283px;top:412px;width:100px;padding:6px;
+    background:#ff4d4d;border:2px solid #c40000;border-radius:3px;font:14px Arial,sans-serif;cursor:pointer;
+  }
+  .check:disabled{opacity:.5;cursor:not-allowed;}
+
+  .pn{
+    position:fixed;bottom:0;background:#9acd32;border:2px solid #6c9a1e;border-bottom:none;
+    border-radius:12px 12px 0 0;padding:4px 8px;font:14px Arial,sans-serif;cursor:pointer;
+  }
+  .prev{left:0;}
+  .next{right:0;}
+</style>
+<script>
+    /* always start on the home page: if this tab hasn't visited it yet, go there first */
+    try { if (!sessionStorage.getItem('csmaHome')) location.replace('index.html'); } catch (e) {}
+  </script>
+  <link rel="stylesheet" href="theme.css">
+</head>
+<body>
+
+  <div class="topline"></div>
+  <nav class="navbar">
+    <a href="simulation.html">Interference</a>
+    <a href="backoff.html">Back-Off</a>
+    <a href="minsize.html" class="active">Minimum Size</a>
+    
+  </nav>
+
+  <div class="info">
+    Network Speed is defined as the rate of data transfer across the medium, typically measured in Mbps. The objective here is to determine the minimum packet size required to successfully detect a collision.<br>
+    The time required to transmit a frame is calculated by dividing the Packet Size by the Network Speed. To identify interference, a node must actively transmit data—and simultaneously monitor the channel—for a duration equal to twice the signal's propagation delay (the round-trip time).<br>
+    Consequently, successful collision detection is directly dependent on the packet being sufficiently large to span this duration.<br>
+   
+  </div>
+
+  <div class="stage">
+    <div class="channel" id="channel"></div>
+    <div class="node user" id="userNode">User Node</div>
+    <div class="node bot" id="botNode">Bot Node</div>
+
+    <div class="btns">
+      <button class="btn-red" id="sizeBtn">Enter Packet Size</button>
+      <div class="sizerow"><input type="number" id="sizeInput" min="0" step="any"> <span>MB</span></div>
+      <button class="btn-red" id="sendBtn">Send<br>Data</button>
+      <button class="btn-red" id="boBtn" disabled>Back Off</button>
+    </div>
+
+    <div class="status" id="status">Status :</div>
+    <input type="number" class="kinput" id="kInput" placeholder="K value (auto)" readonly disabled>
+    <button class="check" id="checkBtn" disabled>Check</button>
+  </div>
+
+  <button class="pn prev" onclick="location.href='backoff.html'">Previous</button>
+  
+
+<script>
+  const CELLS = 26;           // boxes on the line
+  const STEP_MS = 380;        // time for a signal to move one box (bigger = slower)
+  const SPEED = 0.5;          // network speed in MBps
+  const PROP = 15;            // time for a signal to cross the whole line (seconds)
+  const BOT_MIN_GAP = 5000;   // bot waits at least 5 s after its last signal is gone
+  const BOT_MAX_GAP = 10000;
+  const SLOT_MS = 3000;       // back-off slot = 3 s
+
+  const channel  = document.getElementById('channel');
+  const statusEl = document.getElementById('status');
+  const userNode = document.getElementById('userNode');
+  const botNode  = document.getElementById('botNode');
+  const sizeBtn  = document.getElementById('sizeBtn');
+  const sizeInput= document.getElementById('sizeInput');
+  const sendBtn  = document.getElementById('sendBtn');
+  const boBtn    = document.getElementById('boBtn');
+  const kInput   = document.getElementById('kInput');
+  const checkBtn = document.getElementById('checkBtn');
+
+  const cells = [];
+  for (let i = 0; i < CELLS; i++) {
+    const c = document.createElement('div');
+    c.className = 'cell';
+    channel.appendChild(c);
+    cells.push(c);
+  }
+
+  let signals = [];           // { owner:'user'|'bot', pos, dir, damaged }
+  let pkt = null;             // the packet the user is sending right now
+  let packetMB = null;
+  let flashCell = -1;
+  let nextBotAt = Date.now() + 1000;   // first bot signal within ~1 s
+  let botBlocked = false;     // bot silent from back-off until the re-sent packet reaches it
+  let waiting = false;        // back-off countdown running
+  let countdownTimer = null;
+  let K = 0;                  // collisions detected by the user node
+  let attempt = 0;            // collisions for this packet (drives back-off)
+
+  function say(msg) { statusEl.textContent = msg; }
+  function shake(el) { el.classList.add('crash'); setTimeout(() => el.classList.remove('crash'), 400); }
+
+  // time to send the packet, counted in steps (one step = PROP / CELLS seconds)
+  function txTicksFor(size) { return Math.max(1, Math.floor(size * (2 * CELLS) / PROP + 1e-9)); }
+  // how many red boxes we draw for the packet (kept small on purpose)
+  function boxesFor(size) { return Math.max(1, Math.min(6, Math.round(size / 3))); }
+
+  function draw() {
+    cells.forEach((el, i) => { el.className = 'cell' + (i === flashCell ? ' x' : ''); });
+    signals.forEach(s => {
+      if (s.pos >= 0 && s.pos < CELLS && cells[s.pos].className === 'cell')
+        cells[s.pos].classList.add(s.owner === 'user' ? 'u' : 'b');
+    });
+
+    if (waiting)                         userNode.innerHTML = 'User Node : Backing off';
+    else if (pkt && pkt.sending)         userNode.innerHTML = 'User Node : Sending Data<br>Listening to the channel';
+    else if (pkt)                        userNode.innerHTML = 'User Node : Sending Data';
+    else                                 userNode.innerHTML = 'User Node';
+    botNode.innerHTML = signals.some(s => s.owner === 'bot') ? 'Bot Node : Sending Data' : 'Bot Node';
+
+    sendBtn.disabled = !!pkt || waiting;
+    sizeBtn.disabled = !!pkt || waiting;
+    boBtn.disabled = true;                      // back-off is automatic
+    boBtn.classList.toggle('pulse', waiting);
+  }
+
+  function gapAfterBot() {
+    nextBotAt = Date.now() + BOT_MIN_GAP + Math.random() * (BOT_MAX_GAP - BOT_MIN_GAP);
+  }
+
+  function step() {
+    const before = signals.map(s => s.pos);
+    signals.forEach(s => s.pos += s.dir);
+
+    // ---- the user's packet: draw a few boxes, but keep "sending" for the full transmission time ----
+    if (pkt) {
+      pkt.tick++;
+      if (!pkt.detected && pkt.emitted < pkt.V) {
+        signals.push({ owner: 'user', pos: 0, dir: +1, damaged: false });
+        before.push(0);
+        pkt.emitted++;
+      }
+      pkt.sending = !pkt.detected && pkt.tick <= pkt.txTicks;
+    }
+
+    // ---- collision: healthy user box meets healthy bot box ----
+    signals.forEach((u, ui) => {
+      if (u.owner !== 'user' || u.damaged) return;
+      signals.forEach((b, bi) => {
+        if (b.owner !== 'bot' || b.damaged || u.damaged) return;
+        const same    = u.pos === b.pos;
+        const swapped = u.pos === before[bi] && b.pos === before[ui];
+        if (same || swapped) {
+          flashCell = Math.max(0, Math.min(CELLS - 1, Math.min(u.pos, b.pos)));
+          setTimeout(() => { flashCell = -1; draw(); }, 700);
+          u.damaged = true;
+          b.damaged = true;
+          if (pkt) pkt.collided = true;
+          shake(userNode); shake(botNode);
+        }
+      });
+    });
+
+    // ---- boxes reaching the end of the line ----
+    const gone = [];
+    signals.forEach(s => {
+      if (s.pos >= 0 && s.pos < CELLS) return;
+      gone.push(s);
+
+      if (s.owner === 'bot') {
+        gapAfterBot();
+        // the collided bot signal reached the user node: can the user still hear it?
+        if (s.damaged && pkt && pkt.collided && !pkt.heard) {
+          pkt.heard = true;
+          if (pkt.sending) {                          // still transmitting -> detected
+            pkt.detected = true;
+            pkt.sending = false;
+            K++; attempt++;
+            kInput.value = K;
+            say('Collision detected while sending ! K = ' + K + '\nThe packet was large enough, so the node stops and will back off.');
+          } else {
+            say('Collision occurred , but it went undetected as the packet size was too low');
+          }
+        }
+      } else if (pkt) {                               // a user box reached the bot
+        pkt.arrived++;
+        if (pkt.arrived >= pkt.emitted && (pkt.emitted >= pkt.V || pkt.detected)) {
+          pkt.delivered = true;
+          if (!pkt.collided) {
+            attempt = 0;
+            say('Node Sent by user Recieved Succesfully');
+            if (botBlocked) { botBlocked = false; gapAfterBot(); }
+          } else if (pkt.detected) {
+            say('Damaged Packet Recieved !');
+          } else if (pkt.heard) {
+            say('Collision occurred , but it went undetected as the packet size was too low');
+          }
+        }
+      }
+    });
+    signals = signals.filter(s => !gone.includes(s));
+
+    // ---- packet finished? ----
+    if (pkt && pkt.delivered && (!pkt.sending || pkt.tick >= pkt.endTick) && (!pkt.collided || pkt.heard)) {
+      const done = pkt;
+      pkt = null;
+      if (done.detected) {
+        draw();
+        setTimeout(beginBackoff, 1200);
+        return;
+      }
+    }
+    draw();
+  }
+  setInterval(step, STEP_MS);
+
+  function startPacket(msg) {
+    const T = txTicksFor(packetMB);
+    pkt = {
+      V: boxesFor(packetMB), emitted: 0, arrived: 0, tick: 0,
+      txTicks: T, endTick: Math.min(T, 70),
+      sending: true, collided: false, heard: false, detected: false, delivered: false
+    };
+    say(msg);
+    kInput.disabled = false;
+    checkBtn.disabled = false;
+    draw();
+  }
+
+  function setSize() {
+    const v = parseFloat(sizeInput.value);
+    if (!(v > 0)) { say('Please enter a valid packet size in MB.'); return false; }
+    packetMB = v;
+    say('Packet size set to ' + v + ' MB\n(network speed = ' + SPEED + ' MBps, so sending takes ' + (v / SPEED).toFixed(1) + ' s)');
+    return true;
+  }
+  sizeBtn.addEventListener('click', setSize);
+
+  sendBtn.addEventListener('click', () => {
+    if (sendBtn.disabled) return;
+    if (sizeInput.value && !setSize()) return;
+    if (!packetMB) { say('Enter a packet size first.'); return; }
+    attempt = 0;
+    startPacket('Signal is being sent from User Node');
+  });
+
+  // automatic back-off after a detected collision, then re-transmit (bot stays silent)
+  function beginBackoff() {
+    waiting = true;
+    botBlocked = true;
+    const n = Math.min(attempt, 10);
+    const maxR = Math.pow(2, n) - 1;
+    const r = 1 + Math.floor(Math.random() * (maxR + 1));
+    let remaining = r * SLOT_MS;
+    draw();
+    const t = () => {
+      if (remaining <= 0) {
+        clearInterval(countdownTimer);
+        waiting = false;
+        startPacket('Back-off over. Re-transmitting the packet...');
+        return;
+      }
+      say('Back-off: collision #' + attempt + ', r = ' + r + ' (chosen from 1 to ' + (maxR + 1) + ')\nWaiting ' + (remaining / 1000).toFixed(1) + ' s before re-transmitting...');
+      remaining -= 100;
+    };
+    t();
+    countdownTimer = setInterval(t, 100);
+  }
+
+  checkBtn.addEventListener('click', () => {
+    say('K = ' + K + ' collision(s) detected so far.');
+  });
+
+  // bot: one box on the line at a time, >= 5 s gap, silent while botBlocked
+  setInterval(() => {
+    if (botBlocked) return;
+    if (signals.some(s => s.owner === 'bot')) return;
+    if (Date.now() < nextBotAt) return;
+    signals.push({ owner: 'bot', pos: CELLS - 1, dir: -1, damaged: false });
+    draw();
+  }, 300);
+
+  draw();
+</script>
+</body>
+</html>

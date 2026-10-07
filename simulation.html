@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CSMA/CD - Interference</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      min-height: 100%;
+    }
+
+    body {
+      background: #2e98d1;
+      font-family: "Times New Roman", serif;
+      color: #000;
+      overflow-x: auto;
+    }
+
+    .topline {
+      height: 8px;
+      background: #ff6a00;
+    }
+
+    .navbar {
+      background: #9acd32;
+      margin: 8px;
+      padding: 10px;
+      display: flex;
+      gap: 20px;
+    }
+
+    .navbar a {
+      color: #5b2a91;
+      text-decoration: none;
+      font-size: 1.1rem;
+    }
+
+    .navbar a:hover,
+    .navbar a.active {
+      text-decoration: underline;
+    }
+
+    .info {
+      background: #9acd32;
+      margin: 90px 20px 0 20px;
+      padding: 0 2px;
+      font-size: 1rem;
+      line-height: 1.12;
+    }
+
+    .stage {
+      position: relative;
+      width: 1520px;
+      height: 480px;
+    }
+
+    .node {
+      position: absolute;
+      top: 150px;
+      width: 200px;
+      height: 200px;
+      border-radius: 50%;
+      background: #9acd32;
+      border: 2px solid #5d6b3a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font: 14px Arial, sans-serif;
+    }
+
+    .user {
+      left: 208px;
+    }
+
+    .bot {
+      left: 883px;
+    }
+
+    .node.crash {
+      animation: shake .35s;
+    }
+
+    @keyframes shake {
+      25% {
+        transform: translateX(-4px);
+      }
+
+      75% {
+        transform: translateX(4px);
+      }
+    }
+
+    .channel {
+      position: absolute;
+      left: 300px;
+      top: 142px;
+      width: 690px;
+      height: 8px;
+      display: flex;
+      gap: 10px;
+    }
+
+    .cell {
+      flex: 1;
+      height: 6px;
+      background: #000;
+      border: 1px solid #666;
+    }
+
+    .cell.u {
+      background: #ff2020;
+    }
+
+    .cell.b {
+      background: #00e5ff;
+    }
+
+    .cell.x {
+      background: #ff9d00;
+      box-shadow: 0 0 8px 3px #ffd34d;
+    }
+
+    .btn-red {
+      position: absolute;
+      left: 278px;
+      top: 360px;
+      width: 70px;
+      background: #ff4d4d;
+      border: 2px solid #c40000;
+      border-radius: 4px;
+      font: 12px Arial, sans-serif;
+      padding: 4px 8px;
+      cursor: pointer;
+    }
+
+    .btn-red:hover {
+      background: #ff6b6b;
+    }
+
+    .btn-red:disabled {
+      opacity: .6;
+      cursor: not-allowed;
+    }
+
+    .status {
+      position: absolute;
+      left: 1283px;
+      top: 130px;
+      width: 220px;
+      height: 220px;
+      background: #9acd32;
+      border-radius: 4px;
+      padding: 10px;
+      font-size: 14px;
+      overflow-y: auto;
+    }
+
+    .pn {
+      position: fixed;
+      bottom: 0;
+      background: #9acd32;
+      border: 2px solid #6c9a1e;
+      border-bottom: none;
+      border-radius: 12px 12px 0 0;
+      padding: 4px 8px;
+      font: 14px Arial, sans-serif;
+      cursor: pointer;
+    }
+
+    .prev {
+      left: 0;
+    }
+
+    .next {
+      right: 0;
+    }
+  </style>
+  <script>
+    /* always start on the home page: if this tab hasn't visited it yet, go there first */
+    try { if (!sessionStorage.getItem('csmaHome')) location.replace('index.html'); } catch (e) {}
+  </script>
+  <link rel="stylesheet" href="theme.css">
+</head>
+
+<body>
+
+  <div class="topline"></div>
+  <nav class="navbar">
+    <a href="simulation.html" class="active">Interference</a>
+    <a href="backoff.html">Back-Off</a>
+    <a href="minsize.html">Minimum Size</a>
+
+  </nav>
+
+  <div class="info">
+    Collision : It is a term in networking where more than one signals from different nodes travel in a medium and the
+    meet each other.<br>
+    Whenever multiple signals meet, they become scrambled and hence the data sent in the signal is damaged.<br>
+    Here, in page try sending signals from the User node and visualise the collision between the signal sent by you and
+    the bot Node<br>
+    ( The bot node sends signal on its own at random time intervals )
+  </div>
+
+  <div class="stage">
+    <div class="channel" id="channel"></div>
+    <div class="node user" id="userNode">User Node</div>
+    <div class="node bot" id="botNode">Bot Node</div>
+    <button class="btn-red" id="sendBtn">Send<br>Data</button>
+    <div class="status" id="status"></div>
+  </div>
+
+  <button class="pn prev" onclick="location.href='index.html'">Previous</button>
+  <button class="pn next" onclick="location.href='backoff.html'">Next</button>
+
+  <script>
+    const CELLS = 26;
+    const STEP_MS = 520;      // time for a signal to move one box (bigger = slower)
+    const BOT_MIN_GAP = 5000; // minimum 5 s after the previous bot signal is gone
+    const BOT_MAX_GAP = 10000;
+
+    const channel = document.getElementById('channel');
+    const statusEl = document.getElementById('status');
+    const userNode = document.getElementById('userNode');
+    const botNode = document.getElementById('botNode');
+    const sendBtn = document.getElementById('sendBtn');
+
+    const cells = [];
+    for (let i = 0; i < CELLS; i++) {
+      const c = document.createElement('div');
+      c.className = 'cell';
+      channel.appendChild(c);
+      cells.push(c);
+    }
+
+    // signal = { owner:'user'|'bot', pos:Number, dir:+1|-1, damaged:Boolean }
+    let signals = [];
+    let flashCell = -1;
+    let nextBotAt = Date.now() + 1000;   // first bot signal within ~1 s
+
+    function say(msg) { statusEl.textContent = msg; }   // one message at a time
+
+    function shake(el) {
+      el.classList.add('crash');
+      setTimeout(() => el.classList.remove('crash'), 400);
+    }
+
+    function draw() {
+      cells.forEach((c, i) => { c.className = 'cell' + (i === flashCell ? ' x' : ''); });
+      signals.forEach(s => {
+        if (s.pos >= 0 && s.pos < CELLS && cells[s.pos].className === 'cell')
+          cells[s.pos].classList.add(s.owner === 'user' ? 'u' : 'b');
+      });
+      sendBtn.disabled = signals.some(s => s.owner === 'user');   // one user signal at a time
+    }
+
+    function step() {
+      const before = signals.map(s => s.pos);
+      signals.forEach(s => s.pos += s.dir);
+
+      // ---- collision between a healthy user signal and a healthy bot signal ----
+      signals.forEach((u, ui) => {
+        if (u.owner !== 'user' || u.damaged) return;
+        signals.forEach((b, bi) => {
+          if (b.owner !== 'bot' || b.damaged || u.damaged) return;
+          const same = u.pos === b.pos;
+          const swapped = u.pos === before[bi] && b.pos === before[ui];
+          if (same || swapped) {
+            flashCell = Math.max(0, Math.min(CELLS - 1, Math.min(u.pos, b.pos)));
+            setTimeout(() => { flashCell = -1; draw(); }, 700);
+            // both signals are now damaged, but each keeps going to its destination
+            u.damaged = true;
+            b.damaged = true;
+            say('Collision occurred !');
+            shake(userNode); shake(botNode);
+          }
+        });
+      });
+
+      // ---- signals reaching the end of the line ----
+      const gone = [];
+      signals.forEach(s => {
+        if (s.pos >= 0 && s.pos < CELLS) return;
+        gone.push(s);
+
+        if (s.owner === 'user') {
+          // the red message has reached the Bot node
+          say(s.damaged ? 'Damaged Packet Recieved !' : 'Signal reached Bot Node successfully');
+        }
+        if (s.owner === 'bot') {
+          // the bot's own message reached the User node: no status change
+          nextBotAt = Date.now() + BOT_MIN_GAP + Math.random() * (BOT_MAX_GAP - BOT_MIN_GAP);
+        }
+      });
+      signals = signals.filter(s => !gone.includes(s));
+      draw();
+    }
+    setInterval(step, STEP_MS);
+
+    // user sends a packet
+    sendBtn.addEventListener('click', () => {
+      if (signals.some(s => s.owner === 'user')) return;
+      signals.push({ owner: 'user', pos: 0, dir: +1, damaged: false });
+      say('Signal is being sent from User Node');
+      draw();
+    });
+
+    // bot: only one bot signal on the line at a time, with >= 5 s gap after the last one
+    setInterval(() => {
+      if (signals.some(s => s.owner === 'bot')) return;
+      if (Date.now() < nextBotAt) return;
+      signals.push({ owner: 'bot', pos: CELLS - 1, dir: -1, damaged: false });
+      say('Signal is being sent from Bot Node');
+      draw();
+    }, 300);
+
+    draw();
+  </script>
+</body>
+
+</html>

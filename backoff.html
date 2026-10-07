@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>CSMA/CD - Back-Off</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            margin: 0;
+            min-height: 100%;
+        }
+
+        body {
+            background: #2e98d1;
+            font-family: "Times New Roman", serif;
+            color: #000;
+            overflow-x: auto;
+        }
+
+        .topline {
+            height: 8px;
+            background: #ff6a00;
+        }
+
+        .navbar {
+            background: #9acd32;
+            margin: 8px;
+            padding: 10px;
+            display: flex;
+            gap: 20px;
+        }
+
+        .navbar a {
+            color: #5b2a91;
+            text-decoration: none;
+            font-size: 1.1rem;
+        }
+
+        .navbar a:hover,
+        .navbar a.active {
+            text-decoration: underline;
+        }
+
+        .info {
+            background: #9acd32;
+            margin: 90px 20px 0 20px;
+            padding: 0 2px;
+            font-size: 1rem;
+            line-height: 1.12;
+        }
+
+        .stage {
+            position: relative;
+            width: 1520px;
+            height: 520px;
+        }
+
+        .node {
+            position: absolute;
+            top: 150px;
+            width: 200px;
+            height: 200px;
+            border-radius: 50%;
+            background: #9acd32;
+            border: 2px solid #5d6b3a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font: 14px Arial, sans-serif;
+        }
+
+        .user {
+            left: 208px;
+        }
+
+        .bot {
+            left: 878px;
+        }
+
+        .node.crash {
+            animation: shake .35s;
+        }
+
+        @keyframes shake {
+            25% {
+                transform: translateX(-4px);
+            }
+
+            75% {
+                transform: translateX(4px);
+            }
+        }
+
+        .channel {
+            position: absolute;
+            left: 300px;
+            top: 142px;
+            width: 690px;
+            height: 8px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .cell {
+            flex: 1;
+            height: 6px;
+            background: #000;
+            border: 1px solid #666;
+        }
+
+        .cell.u {
+            background: #ff2020;
+        }
+
+        .cell.b {
+            background: #00e5ff;
+        }
+
+        .cell.x {
+            background: #ff9d00;
+            box-shadow: 0 0 8px 3px #ffd34d;
+        }
+
+        .btns {
+            position: absolute;
+            left: 278px;
+            top: 360px;
+            width: 70px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-red {
+            background: #ff4d4d;
+            border: 2px solid #c40000;
+            border-radius: 4px;
+            font: 12px Arial, sans-serif;
+            padding: 4px 8px;
+            cursor: pointer;
+        }
+
+        .btn-red:hover:not(:disabled) {
+            background: #ff6b6b;
+        }
+
+        .btn-red:disabled {
+            opacity: .55;
+            cursor: not-allowed;
+        }
+
+        .btn-red.pulse {
+            animation: pulse .8s infinite;
+        }
+
+        @keyframes pulse {
+            50% {
+                box-shadow: 0 0 10px 3px #fff;
+            }
+        }
+
+        #sendBtn {
+            width: 70px;
+        }
+
+        #boBtn {
+            padding: 2px 8px;
+        }
+
+        .status {
+            position: absolute;
+            left: 1278px;
+            top: 130px;
+            width: 220px;
+            height: 220px;
+            background: #9acd32;
+            border-radius: 4px;
+            padding: 10px;
+            font-size: 14px;
+            overflow-y: auto;
+        }
+
+        .kinput {
+            position: absolute;
+            left: 1278px;
+            top: 360px;
+            width: 220px;
+            padding: 5px 3px;
+            border: 2px solid #000;
+            border-radius: 3px;
+            font: 14px Arial, sans-serif;
+        }
+
+        .kinput:disabled {
+            border-color: transparent;
+            background: #6cb3dc;
+        }
+
+        .check {
+            position: absolute;
+            left: 1378px;
+            top: 392px;
+            width: 120px;
+            padding: 6px;
+            background: #ff0000;
+            border: none;
+            border-radius: 3px;
+            font: 14px Arial, sans-serif;
+            cursor: pointer;
+        }
+
+        .check:disabled {
+            opacity: .5;
+            cursor: not-allowed;
+        }
+
+        .pn {
+            position: fixed;
+            bottom: 0;
+            background: #9acd32;
+            border: 2px solid #6c9a1e;
+            border-bottom: none;
+            border-radius: 12px 12px 0 0;
+            padding: 4px 8px;
+            font: 14px Arial, sans-serif;
+            cursor: pointer;
+        }
+
+        .prev {
+            left: 0;
+        }
+
+        .next {
+            right: 0;
+        }
+    </style>
+    <script>
+    /* always start on the home page: if this tab hasn't visited it yet, go there first */
+    try { if (!sessionStorage.getItem('csmaHome')) location.replace('index.html'); } catch (e) {}
+  </script>
+  <link rel="stylesheet" href="theme.css">
+</head>
+
+<body>
+
+    <div class="topline"></div>
+    <nav class="navbar">
+        <a href="simulation.html">Interference</a>
+        <a href="backoff.html" class="active">Back-Off</a>
+        <a href="minsize.html">Minimum Size</a>
+    </nav>
+
+    <div class="info">
+        Collision: when two or more signals meet on the medium they become scrambled and the data is damaged.<br>
+        Use the "Send Data" button to send a packet from the User node and watch collisions with the Bot node (the Bot
+        sends on its own at random intervals).<br>
+        <b>Notes about this page's behavior:</b><br>
+        - K value counts collisions and now accumulates across transmissions (it is not reset when a packet reaches the
+        bot).<br>
+        - The K-check input and "Check" button are disabled until you send at least one packet (they become enabled
+        after the first Send Data).<br>
+        - User-sent signals are shown in red; bot signals are cyan by default.<br>
+        - The bot sends its first signal quickly (within the first second) and then continues sending at randomized
+        longer intervals.
+    </div>
+
+    <div class="stage">
+        <div class="channel" id="channel"></div>
+        <div class="node user" id="userNode">User Node</div>
+        <div class="node bot" id="botNode">Bot Node</div>
+
+        <div class="btns">
+            <button class="btn-red" id="sendBtn">Send<br>Data</button>
+            <button class="btn-red" id="boBtn" disabled>Back Off</button>
+        </div>
+
+        <div class="status" id="status"></div>
+        <input type="number" class="kinput" id="kInput" placeholder="Enter K value" disabled>
+        <button class="check" id="checkBtn" disabled>Check</button>
+    </div>
+
+    <button class="pn prev" onclick="location.href='simulation.html'">Previous</button>
+    <button class="pn next" onclick="location.href='minsize.html'">Next</button>
+
+    <script>
+        const CELLS = 26;
+        const STEP_MS = 520;        // time for a signal to move one box (bigger = slower)
+        const BOT_MIN_GAP = 5000;   // bot waits at least 5 s after its last signal is gone
+        const BOT_MAX_GAP = 10000;
+        const SLOT_MS = 3000;       // one back-off slot = 3 s
+
+        const channel = document.getElementById('channel');
+        const statusEl = document.getElementById('status');
+        const userNode = document.getElementById('userNode');
+        const botNode = document.getElementById('botNode');
+        const sendBtn = document.getElementById('sendBtn');
+        const boBtn = document.getElementById('boBtn');
+        const kInput = document.getElementById('kInput');
+        const checkBtn = document.getElementById('checkBtn');
+
+        const cells = [];
+        for (let i = 0; i < CELLS; i++) {
+            const c = document.createElement('div');
+            c.className = 'cell';
+            channel.appendChild(c);
+            cells.push(c);
+        }
+
+        let signals = [];            // { owner, pos, dir, damaged }
+        let flashCell = -1;
+        let nextBotAt = Date.now() + 1000;
+
+        let K = 0;                   // total collisions (accumulates, never reset)
+        let attempt = 0;             // collisions for the current packet (drives back-off)
+        let waiting = false;         // back-off countdown running
+        let botBlocked = false;      // bot silent from back-off start until resent packet reaches bot
+        let countdownTimer = null;
+
+        function say(msg) { statusEl.textContent = msg; }
+        function shake(el) {
+            el.classList.add('crash');
+            setTimeout(() => el.classList.remove('crash'), 400);
+        }
+
+        function updateButtons() {
+            const userOnLine = signals.some(s => s.owner === 'user');
+            sendBtn.disabled = userOnLine || waiting;
+            boBtn.disabled = true;                       // back-off is automatic now
+            boBtn.classList.toggle('pulse', waiting);    // blinks while backing off
+        }
+
+        function draw() {
+            cells.forEach((c, i) => { c.className = 'cell' + (i === flashCell ? ' x' : ''); });
+            signals.forEach(s => {
+                if (s.pos >= 0 && s.pos < CELLS && cells[s.pos].className === 'cell')
+                    cells[s.pos].classList.add(s.owner === 'user' ? 'u' : 'b');
+            });
+            updateButtons();
+        }
+
+        function step() {
+            const before = signals.map(s => s.pos);
+            signals.forEach(s => s.pos += s.dir);
+
+            // collision: healthy user signal meets healthy bot signal
+            signals.forEach((u, ui) => {
+                if (u.owner !== 'user' || u.damaged) return;
+                signals.forEach((b, bi) => {
+                    if (b.owner !== 'bot' || b.damaged || u.damaged) return;
+                    const same = u.pos === b.pos;
+                    const swapped = u.pos === before[bi] && b.pos === before[ui];
+                    if (same || swapped) {
+                        flashCell = Math.max(0, Math.min(CELLS - 1, Math.min(u.pos, b.pos)));
+                        setTimeout(() => { flashCell = -1; draw(); }, 700);
+                        u.damaged = true;
+                        b.damaged = true;
+                        K++; attempt++;
+                        kInput.value = K;                        // K box updates by itself
+                        say('Collision occurred ! K = ' + K);
+                        shake(userNode); shake(botNode);
+                    }
+                });
+            });
+
+            // signals reaching the end of the line
+            const gone = [];
+            let startBackoff = false;
+            signals.forEach(s => {
+                if (s.pos >= 0 && s.pos < CELLS) return;
+                gone.push(s);
+                if (s.owner === 'user') {
+                    if (s.damaged) {
+                        say('Damaged Packet Recieved !');
+                        startBackoff = true;
+                    } else {
+                        attempt = 0;
+                        say('Signal reached Bot Node successfully');
+                        if (botBlocked) {
+                            botBlocked = false;   // packet reached bot -> bot may send again after the usual gap
+                            nextBotAt = Date.now() + BOT_MIN_GAP + Math.random() * (BOT_MAX_GAP - BOT_MIN_GAP);
+                        }
+                    }
+                } else {
+                    nextBotAt = Date.now() + BOT_MIN_GAP + Math.random() * (BOT_MAX_GAP - BOT_MIN_GAP);
+                }
+            });
+            signals = signals.filter(s => !gone.includes(s));
+            draw();
+
+            if (startBackoff) {
+                // short pause so the "Damaged Packet" message can be read, then back off automatically
+                setTimeout(beginBackoff, 1500);
+            }
+        }
+        setInterval(step, STEP_MS);
+
+        function sendPacket(msg) {
+            signals.push({ owner: 'user', pos: 0, dir: +1, damaged: false });
+            say(msg);
+            kInput.disabled = false;      // unlocks after the first packet is sent
+            checkBtn.disabled = false;
+            kInput.value = K;
+            draw();
+        }
+
+        sendBtn.addEventListener('click', () => {
+            if (sendBtn.disabled) return;
+            sendPacket('Signal is being sent from User Node');
+        });
+
+        // automatic binary exponential back-off, then retransmit
+        function beginBackoff() {
+            waiting = true;
+            botBlocked = true;                 // bot stays silent until the packet reaches it
+            const n = Math.min(attempt, 10);
+            const maxR = Math.pow(2, n) - 1;
+            const r = 1 + Math.floor(Math.random() * (maxR + 1));   // 1 .. 2^n slots
+            let remaining = r * SLOT_MS;
+            draw();
+
+            const tick = () => {
+                if (remaining <= 0) {
+                    clearInterval(countdownTimer);
+                    waiting = false;
+                    sendPacket('Back-off over. Re-transmitting the packet...');
+                    return;
+                }
+                say(`Back-off: collision #${attempt}, r = ${r} (chosen from 1 to ${maxR + 1}).\n` +
+                    `Waiting ${(remaining / 1000).toFixed(1)} s before re-transmitting...`);
+                remaining -= 100;
+            };
+            tick();
+            countdownTimer = setInterval(tick, 100);
+        }
+
+        // K check
+        checkBtn.addEventListener('click', () => {
+            say('K = ' + K + ' collision(s) detected so far.\n' +
+                'Next back-off wait is chosen from 1 to ' + Math.pow(2, Math.min(attempt, 10)) + ' slots.');
+        });
+
+        // bot: one signal on the line at a time, >= 5 s gap, silent while botBlocked
+        setInterval(() => {
+            if (botBlocked) return;
+            if (signals.some(s => s.owner === 'bot')) return;
+            if (Date.now() < nextBotAt) return;
+            signals.push({ owner: 'bot', pos: CELLS - 1, dir: -1, damaged: false });
+            kInput.readOnly = true;
+            kInput.placeholder = 'K value (auto)';
+            draw();
+        }, 300);
+
+        statusEl.style.whiteSpace = 'pre-line';
+        draw();
+    </script>
+</body>
+
+</html>

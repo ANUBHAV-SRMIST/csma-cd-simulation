@@ -1,0 +1,79 @@
+*{box-sizing:border-box;}
+html,body{margin:0;min-height:100%;}
+body{background:#2e98d1;font-family:"Times New Roman",serif;color:#000;min-height:100vh;}
+
+.topline{height:8px;background:#ff6a00;}
+.navbar{background:#9acd32;margin:8px;padding:10px 10px;display:flex;gap:20px;}
+.navbar a{color:#5b2a91;text-decoration:none;font-size:1.1rem;}
+.navbar a:hover{text-decoration:underline;}
+.navbar a.active{text-decoration:underline;}
+
+/* landing */
+.hero{display:flex;flex-direction:column;align-items:center;justify-content:center;height:calc(100vh - 80px);gap:14px;}
+.hero h2{margin:0;font-size:1.5rem;}
+.btn-green{background:#9acd32;border:2px solid #6c9a1e;border-radius:3px;padding:10px 38px;
+  font:1.1rem Arial,sans-serif;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,.4);}
+.btn-green:hover{background:#a9de3a;}
+
+/* pages */
+.page{padding:0 20px 90px;}
+.page[hidden]{display:none;}
+.info{background:#9acd32;margin:90px 20px 0;padding:0 2px;font-size:1rem;line-height:1.12;}
+
+/* stage: fixed-size scene, scrolls sideways on small screens */
+.stage{position:relative;width:1500px;height:480px;margin:100px 0 0 0;}
+.page{overflow-x:auto;}
+
+.node{position:absolute;top:90px;width:200px;height:200px;border-radius:50%;background:#9acd32;
+  border:2px solid #5d6b3a;display:flex;align-items:center;justify-content:center;
+  font:14px Arial,sans-serif;transition:box-shadow .15s;}
+.node.user{left:208px;}
+.node.bot{left:878px;}
+.node.tx{box-shadow:0 0 18px 4px rgba(255,255,255,.7);}
+.node.crash{animation:shake .35s;box-shadow:0 0 22px 8px rgba(255,60,0,.8);}
+@keyframes shake{25%{transform:translateX(-4px);}75%{transform:translateX(4px);}}
+
+/* channel */
+.channel{position:absolute;left:300px;top:82px;width:690px;height:8px;display:flex;gap:11px;}
+.cell{flex:1;background:#000;border:1px solid #555;height:6px;margin-top:0;transition:background .05s;}
+.cell.u{background:#ff2d2d;}
+.cell.b{background:#00e5ff;}
+.cell.x{background:#ff9d00;box-shadow:0 0 6px 2px #ffd34d;}
+
+/* controls under user node */
+.controls{position:absolute;left:200px;top:300px;width:216px;display:flex;flex-direction:column;align-items:center;gap:8px;}
+.btn-red{background:#ff4d4d;border:2px solid #c40000;border-radius:4px;color:#000;
+  font:12px Arial,sans-serif;padding:4px 8px;cursor:pointer;min-width:70px;}
+.btn-red:hover:not(:disabled){background:#ff6b6b;}
+.btn-red.small{padding:2px 8px;}
+.btn-red:disabled{background:#ff0000;opacity:.55;cursor:not-allowed;}
+.btn-red.pulse{animation:pulse .8s infinite;}
+@keyframes pulse{50%{box-shadow:0 0 10px 3px #fff;}}
+.sizerow{display:flex;align-items:center;gap:4px;font-size:16px;margin-top:-6px;padding-left:20px;}
+.sizerow input{width:48px;height:20px;border:1px solid #666;border-radius:2px;}
+
+/* status panel */
+.statuspanel{position:absolute;left:1278px;top:80px;width:220px;}
+.statusbox{background:#9acd32;height:220px;border-radius:4px;padding:10px;font-size:14px;overflow:hidden;display:flex;flex-direction:column;}
+.log{margin-top:6px;overflow-y:auto;flex:1;font-size:13px;line-height:1.25;}
+.log div{margin-bottom:3px;}
+.log .ok{color:#0b4d00;font-weight:bold;}
+.log .bad{color:#a00000;font-weight:bold;}
+.kinput{display:block;width:100%;margin-top:10px;padding:5px 3px;border:2px solid #000;border-radius:2px;font:14px Arial,sans-serif;}
+.kinput:disabled{border-color:transparent;background:#6cb3dc;}
+.check{display:block;margin:0 0 0 100px;width:100px;font-size:14px;padding:6px;}
+
+/* min size page */
+.calc{background:#9acd32;margin:30px 20px 0;padding:12px 16px;width:420px;font-family:Arial,sans-serif;font-size:14px;}
+.calc h3{margin:0 0 8px;}
+.calc label{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+.calc input{width:90px;padding:3px;}
+.calc-out{font-weight:bold;margin-top:6px;}
+.diagram{display:block;width:800px;max-width:100%;margin:30px 20px;}
+
+/* prev / next */
+.pn{position:fixed;bottom:0;background:#9acd32;border:2px solid #6c9a1e;border-bottom:none;
+  border-radius:12px 12px 0 0;padding:4px 8px;font:14px Arial,sans-serif;cursor:pointer;}
+.pn.prev{left:0;}
+.pn.next{right:0;}
+.pn[hidden]{display:none;}
